@@ -2,12 +2,12 @@ import { parseBSP, Node, BSP, Face } from "./bsp";
 import { parseWad } from "./wad";
 import * as THREE from "three";
 import * as Stats from "stats.js";
-import { Controls } from "./controls";
+import { Controls } from "./Controls";
 import { DescriptionInfo, maps } from "./info/DescriptionInfo";
 import { BspInfo } from "./info/BspInfo";
 import { triangulate, mergeBufferGeometries, triangulateUV, findLeaf, isSpecialBrush } from "./utils";
 import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane, Geometry, Matrix4 } from "three";
-import { WadManager } from "./wadManager";
+import { WadManager } from "./wadmanager";
 
 const LIGHT_LIMIT = 8;
 const NEAR_CLIPPING = 0.1;
@@ -36,6 +36,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 viewElement.appendChild(renderer.domElement);
 
 const wadManager = new WadManager();
+const wads: string[] = [];
 
 window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -43,12 +44,11 @@ window.onresize = () => {
 
 const controlElement = new DescriptionInfo(topElement, (event) => {
     const value = (event.target as HTMLSelectElement).value;
-    const url = `https://devanbuggay.com/bspview/bsp/${value}`;
+    const url = `${value}`;
     loadMapFromUrl(url);
 });
 
 const bspInfo = new BspInfo(bottomElement);
-
 
 function registerDragEvents() {
     ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
@@ -90,6 +90,14 @@ function registerDragEvents() {
     }
 }
 
+async function loadWadFromUrl(url: string) {
+    const response = await fetch(url);
+    const buffer = await response.arrayBuffer();
+    // Get filename and pass to loadWad
+    const filename = url.slice(url.lastIndexOf("/") + 1);
+    wadManager.loadWad(filename, buffer);
+}
+
 async function loadMapFromUrl(url: string) {
     const response = await fetch(url);
     const buffer = await response.arrayBuffer();
@@ -120,7 +128,7 @@ async function loadMap(buffer: ArrayBuffer) {
     const modelFaces: { [key: number]: number } = {};
     const modelMeshes: Mesh[] = [];
 
-    var developmentTexture = new THREE.TextureLoader().load("https://tr.rbxcdn.com/7abbcef4149bbcf912ab31eb3e9bfcec/420/420/Decal/Png");
+    var developmentTexture = new THREE.TextureLoader().load("/const.png");
 
     // immediately use the texture for material creation
     var developmentMaterial = new THREE.MeshBasicMaterial({ map: developmentTexture });
@@ -411,5 +419,35 @@ async function loadMap(buffer: ArrayBuffer) {
 }
 
 registerDragEvents();
-loadMapFromUrl(`https://devanbuggay.com/bspview/bsp/${maps[0]}`);
 
+async function loadWads(dir: string) {
+    const dec = new TextDecoder();
+    const response = await fetch(dir);
+    const buffer = await response.arrayBuffer();
+    const rawHTML = dec.decode(buffer);
+    
+    var doc = document.createElement("html");
+    doc.innerHTML = rawHTML;
+    var links = doc.querySelectorAll("a[href$='.wad']");
+
+    const promises: Promise<any>[] = [];
+    for (const link of links) {
+        promises.push(loadWadFromUrl(dir + link.getAttribute('title')));
+    }
+
+    return Promise.all(promises);
+}
+
+(async () => {
+    // const baseMapListPromise = controlElement.getMapList(`/bsp/`);
+    const baseLoadWadsPromise = loadWads('/wad/');
+    const mapListPromise = controlElement.getMapList(`/game/maps/`);
+    const loadWadsPromise = loadWads('/game/');
+
+    const promises: Promise<any>[] = [/*baseMapListPromise, baseLoadWadsPromise, */mapListPromise, loadWadsPromise];
+
+    await Promise.all(promises);
+    controlElement.renderMapList();
+    loadMapFromUrl(maps[0]);
+
+})();

@@ -83,7 +83,7 @@ export function parseWad(buffer: ArrayBuffer): Wad {
         const mip = t.globalOffset + t.offset1;
         t.pixels = new Uint8Array(buffer.slice(mip, mip + (t.width * t.height)));
 
-        console.log(t.name);
+        //console.log(t.name);
 
         const palleteOffset = t.globalOffset + t.offset8 + Math.floor((t.width * t.height) / 64) + 2;
         const paletteArray = new Uint8Array(buffer.slice(palleteOffset, palleteOffset + (256 * 3)));

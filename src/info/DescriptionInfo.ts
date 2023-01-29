@@ -1,22 +1,11 @@
-export const maps = [
-    "halflife_c1a0.bsp",
-    "halflife_c1a0a.bsp",
-    "halflife_c1a0b.bsp",
-    "halflife_c1a0c.bsp",
-    "halflife_c1a0d.bsp",
-    "halflife_c1a0e.bsp",
-    "de_dust.bsp",
-    "de_dust2.bsp",
-    "de_inferno.bsp",
-    "de_cbble.bsp",
-    "quake_start.bsp"
-];
+export const maps: string[] = [];
 
 export class DescriptionInfo {
 
     public element: HTMLElement;
     public detailsElement: HTMLElement;
     public select: HTMLSelectElement;
+    private callback: ((evt: Event) => any);
 
     constructor(element: HTMLElement, callback: ((evt: Event) => any)) {
         this.element = element;
@@ -24,21 +13,41 @@ export class DescriptionInfo {
         this.select.style.width = "320px";
         this.select.style.fontSize = "1.5em";
 
+        this.callback = callback;
+    }
+
+    async getMapList(dir: string) {
+        const dec = new TextDecoder();
+        const response = await fetch(dir);
+        const buffer = await response.arrayBuffer();
+        const rawHTML = dec.decode(buffer);
+        
+        var doc = document.createElement("html");
+        doc.innerHTML = rawHTML;
+        var links = doc.querySelectorAll("a[href$='.bsp']");
+
+        for (const link of links) {
+            maps.push(dir + link.getAttribute('title'));
+        }
+        return maps;
+    }
+
+    renderMapList() {
         maps.forEach(map => {
             const option = document.createElement("option");
             option.text = map;
             this.select.add(option);
         });
 
-        this.select.addEventListener("change", callback);
+        this.select.addEventListener("change", this.callback);
 
-        element.appendChild(this.select);
+        this.element.appendChild(this.select);
 
         const detailsElement = document.createElement("div");
         detailsElement.className = "details";
 
         this.detailsElement = detailsElement;
-        element.appendChild(this.detailsElement);
+        this.element.appendChild(this.detailsElement);
 
         // Build controls
 
@@ -59,7 +68,6 @@ export class DescriptionInfo {
         githubDiv.style.paddingTop = "20px";
 
         this.detailsElement.appendChild(githubDiv);
-        
     }
 
     addText(data: string) {

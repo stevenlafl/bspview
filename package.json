@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "webpack",
-    "start": "webpack-dev-server --open",
+    "start": "NODE_OPTIONS=--openssl-legacy-provider webpack-dev-server --host 0.0.0.0 --progress --colors --open",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

@@ -9,6 +9,10 @@ export class WadManager {
         this.wads = [];
     }
 
+    getWads(): Wad[] {
+        return this.wads;
+    }
+
     loadWad(name: string, buffer: ArrayBuffer) {
         // Name isn't actually used by the system
         const wad = parseWad(buffer);
