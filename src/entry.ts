@@ -9,7 +9,19 @@ import { triangulate, mergeBufferGeometries, triangulateUV, findLeaf, isSpecialB
 import { Vector3, Face3, Mesh, Color, Quaternion, Vector2, Material, Box3, CameraHelper, Plane, Geometry, Matrix4 } from "three";
 import { WadManager } from "./wadmanager";
 
-const LIGHT_LIMIT = 8;
+THREE.ShaderLib[ 'lambert' ].fragmentShader = THREE.ShaderLib[ 'lambert' ].fragmentShader.replace(
+
+    `vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;`,
+
+    `#ifndef CUSTOM
+        vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;
+    #else
+        vec3 outgoingLight = diffuseColor.rgb * ( 1.0 - 0.5 * ( 1.0 - getShadowMask() ) ); // shadow intensity hardwired to 0.5 here
+    #endif`
+
+);
+
+const LIGHT_LIMIT = 2048;
 const NEAR_CLIPPING = 0.1;
 const FAR_CLIPPING = 6000;
 
@@ -112,8 +124,6 @@ async function loadMap(buffer: ArrayBuffer) {
     }
 
     const scene = new THREE.Scene();
-    const light = new THREE.AmbientLight(0xFFFFFF, 1.0);
-    scene.add(light);
 
     let lightSources = 0;
 
@@ -131,7 +141,7 @@ async function loadMap(buffer: ArrayBuffer) {
     var developmentTexture = new THREE.TextureLoader().load("/const.png");
 
     // immediately use the texture for material creation
-    var developmentMaterial = new THREE.MeshBasicMaterial({ map: developmentTexture });
+    var developmentMaterial = new THREE.MeshStandardMaterial({ map: developmentTexture });
 
     // Build materials
     const materials = bsp.textures.map((texture) => {
@@ -141,7 +151,7 @@ async function loadMap(buffer: ArrayBuffer) {
             const data = wadManager.getTexture(texture.name);
             const dataTexture = new THREE.DataTexture(data, texture.width, texture.height, THREE.RGBAFormat);
             dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
-            const material = new THREE.MeshStandardMaterial({
+            const material = new THREE.MeshLambertMaterial({
                 map: dataTexture
             });
 
@@ -168,7 +178,7 @@ async function loadMap(buffer: ArrayBuffer) {
 
         const dataTexture = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBAFormat);
         dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
-        return new THREE.MeshStandardMaterial({
+        return new THREE.MeshLambertMaterial({
             map: dataTexture,
             transparent,
             vertexColors: true
@@ -182,9 +192,11 @@ async function loadMap(buffer: ArrayBuffer) {
         const height = Math.abs(model.max[2] - model.min[2]);
         const geometry = new THREE.BoxGeometry(width, height, depth);
 
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x00aa11, wireframe: true }));
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0x00aa11, wireframe: true }));
         mesh.position.set((model.max[1] + model.min[1]) / 2, (model.max[2] + model.min[2]) / 2, (model.max[0] + model.min[0]) / 2)
         mesh.visible = false;
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
         modelMeshes.push(mesh);
         scene.add(mesh);
 
@@ -243,6 +255,8 @@ async function loadMap(buffer: ArrayBuffer) {
         geometry.uvsNeedUpdate = true;
 
         const mesh = new THREE.Mesh(geometry);
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
 
         return mesh;
     }
@@ -292,7 +306,11 @@ async function loadMap(buffer: ArrayBuffer) {
         }
     });
 
-    scene.add(new THREE.Mesh(geom, materials));
+    const mapMesh = new THREE.Mesh(geom, materials);
+    mapMesh.receiveShadow = true;
+    mapMesh.castShadow = true;
+
+    scene.add(mapMesh);
 
     //Entity representations
     const baseGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.SphereGeometry(5, 6, 6))
@@ -305,18 +323,51 @@ async function loadMap(buffer: ArrayBuffer) {
         const y = parseFloat(split[1]);
         const z = parseFloat(split[2]);
 
-        switch (entity.classname) {
-            case "light":
-                if (lightSources < LIGHT_LIMIT) {
-                    const light = new THREE.PointLight(0xffffff, .25, 400);
-                    light.position.set(y, z, x);
-                    scene.add(light);
-                    lightSources++;
-                }
-                break;
-            // case "info_player_start":
+        if (entity.classname.includes('light')) {
+            function componentToHex(c: number): string {
+                var hex = c.toString(16);
+                return hex.length == 1 ? "0" + hex : hex;
+            }
+            function rgbToHex(r: number, g: number, b: number): string {
+                return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+            }
 
-            //     break;
+            if (entity._light) {
+                console.log(entity);
+
+                const split = entity._light.split(" ");
+                const r = parseInt(split[0]);
+                const g = parseInt(split[1]);
+                const b = parseInt(split[2]);
+                const radius = split[3] ? parseInt(split[3]) / 255 : 1;
+                const lightColor = rgbToHex(r,g,b);
+
+                console.log(r,g,b,radius);
+
+                switch (entity.classname) {
+                    case "light_environment": {
+                        const light = new THREE.AmbientLight(lightColor, 1.0);
+                        scene.add(light);
+                        break;
+                    }
+                    case "light": {
+                        const light = new THREE.PointLight(lightColor, radius, 1000);
+                        light.position.set(y, z, x);
+                        scene.add(light);
+                        lightSources++;
+                        break;
+                    }
+                    case "light_spot": {
+                        break;
+                    }
+                }
+            }
+            if (entity.light) {
+                const light = new THREE.PointLight(0xFFFFFF, 0.25, parseInt(entity.light) * 4);
+                light.position.set(y, z, x);
+                scene.add(light);
+                lightSources++;
+            }
         }
 
         var geometry = baseGeometry.clone()
@@ -335,9 +386,11 @@ async function loadMap(buffer: ArrayBuffer) {
 
     // Register hotkeys
 
-    let viewMode = 0; // 0 - phong, 1 - normal, 2 - wireframe
+    let oldMat: any = null;
+    let viewMode = 3; // 0 - phong, 1 - normal, 2 - wireframe
     controls.registerHotkey(49, () => { // 1
-        viewMode = (viewMode + 1) % 3;
+        viewMode = (viewMode + 1) % 4;
+
         let material: THREE.Material = null;
         switch (viewMode) {
             case 0:
@@ -352,13 +405,15 @@ async function loadMap(buffer: ArrayBuffer) {
         }
 
         if (material === null) {
-            material = new THREE.MeshBasicMaterial();
+            material = oldMat;
         }
 
-        faceMeshes.forEach(face => {
-            face.material = material;
-            face.updateMatrix()
-        });
+        if (oldMat == null) {
+            oldMat = mapMesh.material;
+        }
+
+        mapMesh.material = material;
+        mapMesh.updateMatrix();
     });
 
     controls.registerHotkey(50, () => { // 2
@@ -439,12 +494,12 @@ async function loadWads(dir: string) {
 }
 
 (async () => {
-    // const baseMapListPromise = controlElement.getMapList(`/bsp/`);
+    const baseMapListPromise = controlElement.getMapList(`/bsp/`);
     const baseLoadWadsPromise = loadWads('/wad/');
     const mapListPromise = controlElement.getMapList(`/game/maps/`);
     const loadWadsPromise = loadWads('/game/');
 
-    const promises: Promise<any>[] = [/*baseMapListPromise, baseLoadWadsPromise, */mapListPromise, loadWadsPromise];
+    const promises: Promise<any>[] = [baseMapListPromise, baseLoadWadsPromise, mapListPromise, loadWadsPromise];
 
     await Promise.all(promises);
     controlElement.renderMapList();

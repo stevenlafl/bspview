@@ -71,11 +71,9 @@ export interface Plane {
 }
 
 export interface Entity {
+    classname: string;
     origin?: string;
-    classname?: string;
-    _light?: string;
-    style?: string;
-    angle?: number;
+    [key: string]: string;
 }
 
 export interface Model {
