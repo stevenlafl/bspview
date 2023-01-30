@@ -1,4 +1,4 @@
-import { parseBSP, Node, BSP, Face } from "./bsp";
+import { parseBSP, Node, BSP, Face, Entity } from "./bsp";
 import { parseWad } from "./wad";
 import * as THREE from "three";
 import * as Stats from "stats.js";
@@ -40,11 +40,13 @@ var context = canvas.getContext('webgl2', { alpha: false });
 const clock = new THREE.Clock();
 const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, NEAR_CLIPPING, FAR_CLIPPING);
 const orthoCamera = new THREE.OrthographicCamera(0, 0, 0, 0, NEAR_CLIPPING, FAR_CLIPPING);
-const renderer = new THREE.WebGLRenderer({ canvas, context });
+const renderer = new THREE.WebGLRenderer({ canvas, context, alpha: true });
 const controls = new Controls(camera, renderer.domElement);
 const raycaster = new THREE.Raycaster();
 
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 viewElement.appendChild(renderer.domElement);
 
 const wadManager = new WadManager();
@@ -73,6 +75,7 @@ function registerDragEvents() {
     }
 
     document.body.addEventListener("drop", drop, false);
+    console.log('registering drop event');
 
     function drop(event: DragEvent) {
         let dt = event.dataTransfer;
@@ -155,6 +158,8 @@ async function loadMap(buffer: ArrayBuffer) {
                 map: dataTexture
             });
 
+            material.shadowSide = THREE.DoubleSide;
+
             return material;
         }
 
@@ -178,11 +183,13 @@ async function loadMap(buffer: ArrayBuffer) {
 
         const dataTexture = new THREE.DataTexture(new Uint8Array(data), texture.width, texture.height, THREE.RGBAFormat);
         dataTexture.wrapS = dataTexture.wrapT = THREE.RepeatWrapping;
-        return new THREE.MeshLambertMaterial({
+        const material = new THREE.MeshLambertMaterial({
             map: dataTexture,
             transparent,
             vertexColors: true
         });
+        material.shadowSide = THREE.DoubleSide;
+        return material;
     });
 
     // Create model debug volumes
@@ -316,8 +323,21 @@ async function loadMap(buffer: ArrayBuffer) {
     const baseGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.SphereGeometry(5, 6, 6))
     const entityGeos: any[] = [];
 
+
+    // const entityMap = new Map<string, Entity>();
+    // bsp.entities.forEach(entity => {
+    //     if (entity.targetname) {
+    //         entityMap.set(entity.targetname, entity);
+    //     }
+    // });
+    // console.log(entityMap);
+
+    let addedUniversalLight = false;
     bsp.entities.forEach(entity => {
-        if (!entity.origin) return;
+        if (!entity.origin) {
+            //console.log(entity);
+            return;
+        }
         const split = entity.origin.split(" ");
         const x = parseFloat(split[0]);
         const y = parseFloat(split[1]);
@@ -328,31 +348,47 @@ async function loadMap(buffer: ArrayBuffer) {
                 var hex = c.toString(16);
                 return hex.length == 1 ? "0" + hex : hex;
             }
-            function rgbToHex(r: number, g: number, b: number): string {
-                return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+            function rgbToHex(r: number, g: number, b: number): number {
+                return Number("0x" + componentToHex(r) + componentToHex(g) + componentToHex(b));
             }
 
             if (entity._light) {
-                console.log(entity);
 
                 const split = entity._light.split(" ");
-                const r = parseInt(split[0]);
-                const g = parseInt(split[1]);
-                const b = parseInt(split[2]);
-                const radius = split[3] ? parseInt(split[3]) / 255 : 1;
-                const lightColor = rgbToHex(r,g,b);
+                let r = parseInt(split[0]);
+                let g = parseInt(split[1]);
+                let b = parseInt(split[2]);
 
-                console.log(r,g,b,radius);
+                if (!g || !b) {
+                    g = r;
+                    b = r;
+                }
+
+                const luminosity = split[3] ? parseInt(split[3]) / 255 : 1;
+                const radius = 1000;
+                const lightColor = rgbToHex(r,g,b);
 
                 switch (entity.classname) {
                     case "light_environment": {
-                        const light = new THREE.AmbientLight(lightColor, 1.0);
-                        scene.add(light);
+                        if (!addedUniversalLight) {
+                            const light = new THREE.AmbientLight(lightColor, 1.0);
+                            scene.add(light);
+                            addedUniversalLight = true;
+                        }
                         break;
                     }
                     case "light": {
-                        const light = new THREE.PointLight(lightColor, radius, 1000);
+                        if (lightSources >= LIGHT_LIMIT) {
+                            break;
+                        }
+                        if (parseInt(entity.spawnflags) == 1) {
+                            break;
+                        }
+                        const light = new THREE.PointLight(lightColor, luminosity, radius);
                         light.position.set(y, z, x);
+                        light.shadow.bias = - 0.004;
+                        //light.castShadow = true;
+
                         scene.add(light);
                         lightSources++;
                         break;
@@ -362,6 +398,8 @@ async function loadMap(buffer: ArrayBuffer) {
                     }
                 }
             }
+
+            // Quake style light
             if (entity.light) {
                 const light = new THREE.PointLight(0xFFFFFF, 0.25, parseInt(entity.light) * 4);
                 light.position.set(y, z, x);
@@ -379,6 +417,8 @@ async function loadMap(buffer: ArrayBuffer) {
     const geometriesCubes = mergeBufferGeometries(entityGeos, false);
     const entityMesh = new THREE.Mesh(geometriesCubes, new THREE.MeshNormalMaterial());
     entityMesh.visible = false;
+    entityMesh.castShadow = true;
+    entityMesh.receiveShadow = true;
     scene.add(entityMesh);
 
     controls.movementSpeed = 300;
@@ -503,6 +543,6 @@ async function loadWads(dir: string) {
 
     await Promise.all(promises);
     controlElement.renderMapList();
-    loadMapFromUrl(maps[0]);
+    loadMapFromUrl(maps[4]);
 
 })();
