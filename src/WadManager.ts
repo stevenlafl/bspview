@@ -4,15 +4,42 @@ import {
     DataTexture,
     RepeatWrapping,
     RGBAFormat,
-    TextureLoader,
 } from "three";
 import { QuakeTexture } from "./QuakeTexture";
 
-// eslint-disable-next-line
-const missing = require("../docs/missing.png");
+// Generate Valve-style purple/black checkerboard missing texture
+function createMissingTexture(): DataTexture {
+    const size = 64;
+    const checkSize = 8;
+    const data = new Uint8Array(size * size * 4);
 
-const developmentTexture = new TextureLoader().load(missing);
-developmentTexture.wrapS = developmentTexture.wrapT = RepeatWrapping;
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const i = (y * size + x) * 4;
+            const isCheck = ((Math.floor(x / checkSize) + Math.floor(y / checkSize)) % 2) === 0;
+
+            if (isCheck) {
+                // Purple (255, 0, 255)
+                data[i] = 255;
+                data[i + 1] = 0;
+                data[i + 2] = 255;
+            } else {
+                // Black
+                data[i] = 0;
+                data[i + 1] = 0;
+                data[i + 2] = 0;
+            }
+            data[i + 3] = 255; // Alpha
+        }
+    }
+
+    const texture = new DataTexture(data, size, size, RGBAFormat);
+    texture.wrapS = texture.wrapT = RepeatWrapping;
+    texture.needsUpdate = true;
+    return texture;
+}
+
+const developmentTexture = createMissingTexture();
 
 export class WadManager {
     private wads: Map<string, Wad>;
