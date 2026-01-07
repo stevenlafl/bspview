@@ -15,7 +15,7 @@ RUN npm run build
 RUN npm install -g .
 
 COPY ./entrypoint.sh /node/entrypoint.sh
-COPY ./docs/wad /node/wad
+# COPY ./docs/wad /node/wad
 COPY ./resgen /usr/local/bin/resgen
 
 USER 1001:1001

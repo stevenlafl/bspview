@@ -72,7 +72,7 @@ let mapsDir = path.resolve(cwd(), 'maps');
             let resFile = fs.readFileSync(path.resolve(mapsDir, file));
 
             let zip = new JSZip();
-            zip.file('maps/' + mapCommonName, fs.readFileSync(mapsDir + '/' + mapCommonName + '.bsp'));
+            zip.file('maps/' + mapCommonName + '.bsp', fs.readFileSync(mapsDir + '/' + mapCommonName + '.bsp'));
 
             // For each line that does not start with a comment
             resFile.toString().split('\n').forEach((line) => {
