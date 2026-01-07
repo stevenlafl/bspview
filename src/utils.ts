@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 import { Vector3, Face3, Vector2, Plane } from "three";
-import { Bsp, Texture } from "./bsp";
+import { Bsp, Texture } from "./Bsp";
 
 /**
  * @param  {Array<BufferGeometry>} geometries
@@ -238,7 +238,7 @@ export function getVisibilityList(bsp: Bsp, leafIndex: number): number[] {
 export function parseString(buffer: ArrayBuffer) {
     const a = new Uint8Array(buffer);
     const nullIndex = a.indexOf(0);
-    const s = Buffer.from(buffer.slice(0, nullIndex)).toString().toLowerCase();
+    const s = new TextDecoder().decode(buffer.slice(0, nullIndex)).toLowerCase();
     return s;
 }
 

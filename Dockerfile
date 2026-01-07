@@ -1,19 +1,13 @@
 FROM node:latest
 
-# Node
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
 RUN mkdir /app
 WORKDIR /app
-
-COPY ./package.json /app/package.json
-COPY ./package-lock.json /app/package-lock.json
+COPY ./ /app
 
 RUN npm install
 
 ENV PATH /app/node_modules/.bin:$PATH
 
-# Nginx
-RUN apt-get update && apt-get install -y nginx
-
-COPY ./ /app
-
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["webpack-dev-server", "--host", "0.0.0.0", "--progress", "--colors", "--open"]

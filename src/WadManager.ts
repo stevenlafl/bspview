@@ -22,8 +22,12 @@ export class WadManager {
         this.wads = new Map<string, Wad>();
     }
 
+    getWads(): Wad[] {
+        return Array.from(this.wads.values());
+    }
+
     names() {
-        return this.wads.keys;
+        return this.wads.keys();
     }
 
     load(name: string, buffer: ArrayBuffer) {
@@ -41,11 +45,11 @@ export class WadManager {
         this.wads.clear();
     }
 
-    find(name: string) {
+    find(textureName: string) {
         // Loop over loaded wads until we find a texture with the same name
 
         for (const [_, wad] of this.wads) {
-            const texture = wad.textures[name];
+            const texture = wad.textures[textureName];
             if (texture) {
                 const qt = this.data(texture);
                 const dataTexture = new DataTexture(
@@ -58,7 +62,7 @@ export class WadManager {
             }
         }
 
-        console.warn(`Texture not found: ${name}`);
+        console.warn(`Texture not found: ${textureName}`);
 
         return developmentTexture;
     }
