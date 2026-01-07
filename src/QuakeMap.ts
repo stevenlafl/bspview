@@ -67,6 +67,7 @@ export class QuakeMap {
                 const material = new MeshLambertMaterial({
                     map: data,
                 });
+                material.shadowSide = 2; // THREE.DoubleSide
 
                 return material;
             }
@@ -85,12 +86,14 @@ export class QuakeMap {
                 RGBAFormat
             );
             dataTexture.wrapS = dataTexture.wrapT = RepeatWrapping;
-            return new MeshPhongMaterial({
+            const material = new MeshPhongMaterial({
                 map: dataTexture,
                 // envMap: dataTexture,
                 transparent: quakeTexture.transparant(),
                 vertexColors: true,
             });
+            material.shadowSide = 2; // THREE.DoubleSide
+            return material;
         });
 
         // First model is always the parent level node

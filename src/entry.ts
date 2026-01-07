@@ -141,7 +141,7 @@ async function loadMapFromURL(url: string) {
     const buffer = await response.arrayBuffer();
 
     if (buffer.byteLength > 0) {
-        loadMap(buffer);
+        loadMap(buffer, url);
     }
 }
 
@@ -154,13 +154,62 @@ function checkMobileSupport() {
 
 checkMobileSupport();
 
-async function loadMap(buffer: ArrayBuffer) {
+async function loadMap(buffer: ArrayBuffer, mapUrl?: string) {
 
     const scene = new Scene();
     const light = new AmbientLight(0xffffff, 0.1);
     scene.add(light);
 
-    const map = new QuakeMap(buffer, wadManager);
+    // First pass: create map to discover required WADs
+    let map = new QuakeMap(buffer, wadManager);
+
+    // Try to load missing WADs from relative path
+    if (mapUrl) {
+        const wadState = wadManager.wadState();
+        const missingWads = Object.entries(wadState)
+            .filter(([_, loaded]) => !loaded)
+            .map(([name]) => name);
+
+        if (missingWads.length > 0) {
+            const baseDir = mapUrl.substring(0, mapUrl.lastIndexOf('/') + 1);
+            const parentDir = baseDir.substring(0, baseDir.slice(0, -1).lastIndexOf('/') + 1);
+
+            const loadPromises: Promise<boolean>[] = [];
+
+            for (const wadName of missingWads) {
+                // Try loading from same directory as BSP, then parent directory
+                const tryPaths = [
+                    baseDir + wadName,
+                    parentDir + wadName,
+                ];
+
+                loadPromises.push((async () => {
+                    for (const path of tryPaths) {
+                        try {
+                            const response = await fetch(path);
+                            if (response.ok) {
+                                const wadBuffer = await response.arrayBuffer();
+                                wadManager.load(wadName, wadBuffer);
+                                console.log(`Loaded WAD from: ${path}`);
+                                return true;
+                            }
+                        } catch (e) {
+                            // Continue to next path
+                        }
+                    }
+                    console.warn(`Could not find WAD: ${wadName}`);
+                    return false;
+                })());
+            }
+
+            const results = await Promise.all(loadPromises);
+
+            // If any WADs were loaded, recreate the map
+            if (results.some(loaded => loaded)) {
+                map = new QuakeMap(buffer, wadManager);
+            }
+        }
+    }
 
     scene.add(map.mesh());
 
