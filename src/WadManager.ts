@@ -8,11 +8,14 @@ import {
 } from "three";
 import { QuakeTexture } from "./QuakeTexture";
 
-// eslint-disable-next-line
-const missing = require("../docs/missing.png");
+let missingTexture: DataTexture = new DataTexture(
+    new Uint8Array([255, 0, 255, 255]),
+    17,
+    17,
+    RGBAFormat
+);
 
-const developmentTexture = new TextureLoader().load(missing);
-developmentTexture.wrapS = developmentTexture.wrapT = RepeatWrapping;
+// eslint-disable-next-line
 
 export class WadManager {
     private wads: Map<string, Wad>;
@@ -60,7 +63,7 @@ export class WadManager {
 
         console.warn(`Texture not found: ${name}`);
 
-        return developmentTexture;
+        return missingTexture;
     }
 
     public setRequiredWads(wads: string[]) {

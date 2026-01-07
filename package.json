@@ -1,29 +1,29 @@
 {
-  "name": "bspview",
+  "name": "bspreader",
   "version": "1.0.0",
   "description": "",
   "dependencies": {
-    "@tweakpane/core": "^1.1.4",
-    "@tweakpane/plugin-essentials": "^0.1.7",
-    "stats.js": "^0.17.0",
+    "commander": "^11.0.0",
+    "jszip": "^3.10.1",
     "three": "^0.114.0",
-    "tweakpane": "^3.1.4"
+    "ts-node": "^10.9.1"
   },
   "devDependencies": {
     "@types/node": "^18.14.4",
-    "@types/stats.js": "^0.17.0",
     "@types/three": "^0.103.2",
     "@typescript-eslint/eslint-plugin": "^5.54.0",
     "@typescript-eslint/parser": "^5.54.0",
     "buffer": "^5.7.1",
-    "parcel": "^2.8.3",
     "prettier": "^2.8.4",
     "typescript": "^4.9.5"
   },
   "scripts": {
-    "start": "parcel src/index.html",
-    "build": "parcel build --public-url /bspview --dist-dir docs --no-content-hash --no-source-maps src/index.html",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "test": "ts-node src/index.ts docs/bsp/halflife_c1a0.bsp"
+  },
+  "main": "./dist/index.js",
+  "bin": {
+    "bspreader": "./dist/index.js"
   },
   "author": "",
   "license": "ISC"

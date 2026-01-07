@@ -1,1 +1,1 @@
-docker build -t stevenlafl/bspview .
+docker build -t stevenlafl/bspreader .

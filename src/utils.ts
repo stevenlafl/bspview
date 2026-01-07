@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 import { Vector3, Face3, Vector2, Plane } from "three";
-import { Bsp, Texture } from "./bsp";
+import { Bsp, Texture } from "./Bsp";
 
 /**
  * @param  {Array<BufferGeometry>} geometries

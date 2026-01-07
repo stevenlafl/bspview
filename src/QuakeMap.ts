@@ -1,3 +1,5 @@
+import * as path from 'path';
+import * as fs from 'fs';
 import {
     Color,
     DataTexture,
@@ -15,17 +17,26 @@ import { WadManager } from "./WadManager";
 import { triangulate, triangulateUV, isSpecialBrush } from "./utils";
 import { QuakeTexture } from "./QuakeTexture";
 
-// eslint-disable-next-line
-const missing = require("../docs/missing.png");
-
+let ignoredWads = [
+    'cached.wad',
+    'decals.wad',
+    'fonts.wad',
+    'gfx.wad',
+    'halflife.wad',
+    'liquids.wad',
+    'spraypaint.wad',
+    'xeno.wad'
+]
 
 export class QuakeMap {
     private bsp: Bsp;
 
     private mergedMesh: Mesh;
     private requiredWads: string[];
+    private requiredModels: string[];
+    private requiredSounds: string[];
 
-    constructor(private buffer: ArrayBuffer, private wadManager: WadManager) {
+    constructor(rootDir: string, private buffer: ArrayBuffer, private wadManager: WadManager) {
         // Parse and update BSP
         this.bsp = new Bsp(this.buffer);
         // bspInfo.update(bsp);
@@ -37,6 +48,19 @@ export class QuakeMap {
             .flat()
             .filter(wad => wad.length > 0);
 
+        this.requiredModels = this.bsp.entities.filter((entity) => entity.model !== undefined && !entity.model.startsWith('*')).map((entity) => entity.model);
+        this.requiredSounds = this.bsp.entities.filter((entity) => entity.message !== undefined && entity.message.includes('.wav')).map((entity) => entity.message);
+
+        for (const wad of this.requiredWads) {
+            if (ignoredWads.includes(wad)) {
+                wadManager.load(wad, fs.readFileSync('/node/wad/' + wad).buffer)
+            }
+            else {
+                let p = rootDir + '/' + wad;
+                console.log(p);
+                wadManager.load(wad, fs.readFileSync(p).buffer)
+            }
+        }
         wadManager.setRequiredWads(this.requiredWads);
 
         // var textureCube = createCubeMap();
@@ -215,5 +239,13 @@ export class QuakeMap {
 
     public bspData(): Bsp {
         return this.bsp;
+    }
+
+    public get requiredAssets(): Record<string, string[]> {
+        return {
+            wads: this.requiredWads.filter(wad => !ignoredWads.includes(wad)),
+            models: this.requiredModels,
+            sound: this.requiredSounds,
+        }
     }
 }

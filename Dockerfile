@@ -1,19 +1,24 @@
 FROM node:latest
 
-# Node
-RUN mkdir /app
-WORKDIR /app
+# Create app directory
+WORKDIR /node
 
-COPY ./package.json /app/package.json
-COPY ./package-lock.json /app/package-lock.json
+# Install app dependencies
+COPY package*.json ./
 
 RUN npm install
 
-ENV PATH /app/node_modules/.bin:$PATH
+COPY tsconfig.json /node/tsconfig.json
+COPY ./src /node/src
 
-# Nginx
-RUN apt-get update && apt-get install -y nginx
+RUN npm run build
+RUN npm install -g .
 
-COPY ./ /app
+COPY ./entrypoint.sh /node/entrypoint.sh
+COPY ./docs/wad /node/wad
+COPY ./resgen /usr/local/bin/resgen
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+USER 1001:1001
+WORKDIR /app
+
+ENTRYPOINT ["/node/entrypoint.sh"]
